@@ -6,7 +6,7 @@ public class PlayerVisualSetup3D : MonoBehaviour
     [SerializeField] string weaponResourcePath = "Models/blaster-e";
     [SerializeField] string heroTextureResourcePath = "Models/texture-r";
 
-    [SerializeField] Vector3 heroPos = new Vector3(0f, 0.55f, 0f);
+    [SerializeField] Vector3 heroPos = new Vector3(0f, 0f, 0f);
     [SerializeField] Vector3 heroRot = new Vector3(0f, 0f, 0f);
     [SerializeField] Vector3 heroScale = Vector3.one;
 
@@ -23,7 +23,10 @@ public class PlayerVisualSetup3D : MonoBehaviour
         Ensure("WeaponModel", Resources.Load<GameObject>(weaponResourcePath), weaponParent, weaponPos, weaponRot, weaponScale);
 
         if (hero != null)
+        {
             ApplyHeroTexture(hero.transform);
+            AlignHeroFeetToGround(hero.transform);
+        }
     }
 
     void RemoveLegacy()
@@ -63,5 +66,25 @@ public class PlayerVisualSetup3D : MonoBehaviour
                 else m.color = Color.white;
             }
         }
+    }
+
+    void AlignHeroFeetToGround(Transform heroRoot)
+    {
+        var renderers = heroRoot.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0) return;
+
+        float minY = float.PositiveInfinity;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            var r = renderers[i];
+            if (r == null) continue;
+            if (r.bounds.min.y < minY) minY = r.bounds.min.y;
+        }
+
+        if (float.IsPositiveInfinity(minY)) return;
+
+        // Put model feet just above the floor to avoid z-fighting.
+        float lift = 0.01f - minY;
+        heroRoot.position += new Vector3(0f, lift, 0f);
     }
 }

@@ -2,16 +2,22 @@ using UnityEngine;
 
 public class LevelBuilder : MonoBehaviour
 {
-    [SerializeField] int width = 26;
-    [SerializeField] int height = 16;
+    [SerializeField] int width = 42;
+    [SerializeField] int height = 28;
     [SerializeField] float cellSize = 1f;
-    [SerializeField] float wallHeight = 1.4f;
+    [SerializeField] float wallHeight = 2.2f;
 
-    [SerializeField] int enemyCount = 5;
+    [SerializeField] int enemyCount = 10;
+    [SerializeField] int obstacleCount = 22;
+    [SerializeField] int buildingCount = 7;
+    [SerializeField] int chestCount = 14;
 
     void Awake()
     {
         BuildArena();
+        SpawnObstacles();
+        SpawnBuildings();
+        SpawnChests();
         EnsurePlayer();
         EnsureCamera();
         EnsureLight();
@@ -34,10 +40,10 @@ public class LevelBuilder : MonoBehaviour
         floor.transform.localScale = new Vector3(w, 0.1f, h);
         Paint(floor, new Color(0.1f, 0.12f, 0.18f));
 
-        CreateWall(root, new Vector3(0f, wallHeight * 0.5f, h * 0.5f), new Vector3(w, wallHeight, 1f));
-        CreateWall(root, new Vector3(0f, wallHeight * 0.5f, -h * 0.5f), new Vector3(w, wallHeight, 1f));
-        CreateWall(root, new Vector3(-w * 0.5f, wallHeight * 0.5f, 0f), new Vector3(1f, wallHeight, h));
-        CreateWall(root, new Vector3(w * 0.5f, wallHeight * 0.5f, 0f), new Vector3(1f, wallHeight, h));
+        CreateWall(root, new Vector3(0f, wallHeight * 0.5f, h * 0.5f), new Vector3(w, wallHeight, 1.2f));
+        CreateWall(root, new Vector3(0f, wallHeight * 0.5f, -h * 0.5f), new Vector3(w, wallHeight, 1.2f));
+        CreateWall(root, new Vector3(-w * 0.5f, wallHeight * 0.5f, 0f), new Vector3(1.2f, wallHeight, h));
+        CreateWall(root, new Vector3(w * 0.5f, wallHeight * 0.5f, 0f), new Vector3(1.2f, wallHeight, h));
     }
 
     void CreateWall(Transform parent, Vector3 pos, Vector3 scale)
@@ -117,12 +123,126 @@ public class LevelBuilder : MonoBehaviour
 
         for (int i = 0; i < enemyCount; i++)
         {
-            float x = Random.Range(-9f, 9f);
-            float z = Random.Range(-5f, 5f);
+            Vector3 p = RandomEnemySpawn(2.5f);
             var e = new GameObject("Enemy");
-            e.transform.position = new Vector3(x, 0.35f, z);
+            e.transform.position = p;
             e.AddComponent<ChaserEnemy3D>();
         }
+    }
+
+    void SpawnObstacles()
+    {
+        var root = new GameObject("Obstacles").transform;
+        root.SetParent(transform);
+
+        for (int i = 0; i < obstacleCount; i++)
+        {
+            Vector3 p = RandomGroundPos(2f);
+            var go = GameObject.CreatePrimitive(i % 3 == 0 ? PrimitiveType.Cylinder : PrimitiveType.Cube);
+            go.name = "Obstacle";
+            go.transform.SetParent(root);
+            go.transform.position = new Vector3(p.x, 0.35f, p.z);
+            float sx = Random.Range(0.6f, 1.2f);
+            float sy = Random.Range(0.7f, 1.6f);
+            float sz = Random.Range(0.6f, 1.2f);
+            go.transform.localScale = new Vector3(sx, sy, sz);
+            Paint(go, new Color(0.26f, 0.28f, 0.33f));
+            go.AddComponent<WallTag>();
+        }
+    }
+
+    void SpawnBuildings()
+    {
+        var root = new GameObject("Buildings").transform;
+        root.SetParent(transform);
+
+        for (int i = 0; i < buildingCount; i++)
+        {
+            Vector3 p = RandomGroundPos(4.5f);
+
+            var basePart = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            basePart.name = "Building";
+            basePart.transform.SetParent(root);
+            float w = Random.Range(2.4f, 4.2f);
+            float h = Random.Range(2.4f, 5.2f);
+            float d = Random.Range(2.4f, 4.2f);
+            basePart.transform.position = new Vector3(p.x, h * 0.5f, p.z);
+            basePart.transform.localScale = new Vector3(w, h, d);
+            Paint(basePart, new Color(0.22f, 0.24f, 0.3f));
+            basePart.AddComponent<WallTag>();
+
+            var roof = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            roof.name = "Roof";
+            roof.transform.SetParent(basePart.transform);
+            roof.transform.localPosition = new Vector3(0f, 0.55f, 0f);
+            roof.transform.localScale = new Vector3(1.1f, 0.12f, 1.1f);
+            Paint(roof, new Color(0.38f, 0.4f, 0.45f));
+            roof.AddComponent<WallTag>();
+        }
+    }
+
+    void SpawnChests()
+    {
+        var root = new GameObject("Chests").transform;
+        root.SetParent(transform);
+
+        for (int i = 0; i < chestCount; i++)
+        {
+            Vector3 p = RandomGroundPos(1.8f);
+
+            var chest = new GameObject("Chest");
+            chest.transform.SetParent(root);
+            chest.transform.position = new Vector3(p.x, 0.22f, p.z);
+
+            var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            body.name = "Body";
+            body.transform.SetParent(chest.transform);
+            body.transform.localPosition = Vector3.zero;
+            body.transform.localScale = new Vector3(0.7f, 0.4f, 0.5f);
+            Paint(body, new Color(0.42f, 0.26f, 0.12f));
+            body.AddComponent<WallTag>();
+
+            var lid = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            lid.name = "Lid";
+            lid.transform.SetParent(chest.transform);
+            lid.transform.localPosition = new Vector3(0f, 0.26f, 0f);
+            lid.transform.localScale = new Vector3(0.76f, 0.16f, 0.56f);
+            Paint(lid, new Color(0.55f, 0.34f, 0.15f));
+            lid.AddComponent<WallTag>();
+        }
+    }
+
+    Vector3 RandomGroundPos(float padding)
+    {
+        float halfW = width * cellSize * 0.5f - padding;
+        float halfH = height * cellSize * 0.5f - padding;
+        for (int i = 0; i < 35; i++)
+        {
+            float x = Random.Range(-halfW, halfW);
+            float z = Random.Range(-halfH, halfH);
+            var candidate = new Vector3(x, 0.2f, z);
+            if (!Physics.CheckBox(candidate, new Vector3(0.65f, 0.65f, 0.65f)))
+                return new Vector3(x, 0f, z);
+        }
+        return Vector3.zero;
+    }
+
+    Vector3 RandomEnemySpawn(float padding)
+    {
+        float radius = 0.32f;
+        float height = 1f;
+        float half = Mathf.Max(height * 0.5f - radius, 0.01f);
+
+        for (int i = 0; i < 48; i++)
+        {
+            Vector3 p = RandomGroundPos(padding);
+            Vector3 p1 = p + Vector3.up * radius;
+            Vector3 p2 = p1 + Vector3.up * (half * 2f);
+            if (!Physics.CheckCapsule(p1, p2, radius, ~0, QueryTriggerInteraction.Ignore))
+                return p;
+        }
+
+        return RandomGroundPos(padding);
     }
 }
 
