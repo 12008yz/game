@@ -3,6 +3,7 @@ using UnityEngine;
 public class ChaserEnemy3D : MonoBehaviour
 {
     [SerializeField] float speed = 2.3f;
+    [SerializeField] float turnSpeed = 12f;
     [SerializeField] int hp = 2;
     [SerializeField] float bodyRadius = 0.32f;
     [SerializeField] float bodyHeight = 1f;
@@ -45,7 +46,16 @@ public class ChaserEnemy3D : MonoBehaviour
         {
             Vector3 step = d.normalized * (speed * Time.deltaTime);
             MoveWithCollision(step);
+            RotateTowards(d);
         }
+    }
+
+    void RotateTowards(Vector3 direction)
+    {
+        direction.y = 0f;
+        if (direction.sqrMagnitude <= 0.0001f) return;
+        Quaternion targetRotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, turnSpeed * Time.deltaTime);
     }
 
     void MoveWithCollision(Vector3 step)

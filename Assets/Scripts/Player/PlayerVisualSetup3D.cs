@@ -10,8 +10,8 @@ public class PlayerVisualSetup3D : MonoBehaviour
     [SerializeField] Vector3 heroRot = new Vector3(0f, 0f, 0f);
     [SerializeField] Vector3 heroScale = Vector3.one;
 
-    [SerializeField] Vector3 weaponPos = new Vector3(0.02f, 0.52f, 0.28f);
-    [SerializeField] Vector3 weaponRot = new Vector3(0f, 90f, 0f);
+    [SerializeField] Vector3 weaponPos = new Vector3(0.16f, 0.88f, 0.18f);
+    [SerializeField] Vector3 weaponRot = new Vector3(8f, 95f, -6f);
     [SerializeField] Vector3 weaponScale = new Vector3(0.62f, 0.62f, 0.62f);
 
     void Awake()
@@ -19,7 +19,7 @@ public class PlayerVisualSetup3D : MonoBehaviour
         RemoveLegacy();
 
         var hero = Ensure("HeroModel", Resources.Load<GameObject>(heroResourcePath), transform, heroPos, heroRot, heroScale);
-        var weaponParent = hero != null ? hero.transform : transform;
+        var weaponParent = hero != null ? FindWeaponAnchor(hero.transform) : transform;
         Ensure("WeaponModel", Resources.Load<GameObject>(weaponResourcePath), weaponParent, weaponPos, weaponRot, weaponScale);
 
         if (hero != null)
@@ -39,7 +39,13 @@ public class PlayerVisualSetup3D : MonoBehaviour
     {
         if (prefab == null || parent == null) return null;
         var existing = parent.Find(childName);
-        if (existing != null) return existing.gameObject;
+        if (existing != null)
+        {
+            existing.localPosition = pos;
+            existing.localRotation = Quaternion.Euler(euler);
+            existing.localScale = scale;
+            return existing.gameObject;
+        }
 
         var go = Instantiate(prefab, parent);
         go.name = childName;
@@ -49,6 +55,31 @@ public class PlayerVisualSetup3D : MonoBehaviour
         foreach (var c in go.GetComponentsInChildren<Collider>(true))
             Destroy(c);
         return go;
+    }
+
+    static Transform FindWeaponAnchor(Transform heroRoot)
+    {
+        if (heroRoot == null) return null;
+
+        string[] preferredNames =
+        {
+            "righthand", "right_hand", "hand_r", "weapon", "gun", "arm_r", "rightarm"
+        };
+
+        var all = heroRoot.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < preferredNames.Length; i++)
+        {
+            string needle = preferredNames[i];
+            for (int j = 0; j < all.Length; j++)
+            {
+                var t = all[j];
+                if (t == null || t == heroRoot) continue;
+                if (t.name.ToLowerInvariant().Contains(needle))
+                    return t;
+            }
+        }
+
+        return heroRoot;
     }
 
     void ApplyHeroTexture(Transform heroRoot)

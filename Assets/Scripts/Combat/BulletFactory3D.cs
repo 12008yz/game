@@ -2,6 +2,8 @@ using UnityEngine;
 
 public static class BulletFactory3D
 {
+    static Material _bulletMaterial;
+
     public static void Spawn(Vector3 position, Vector3 direction, float speed)
     {
         var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -23,11 +25,16 @@ public static class BulletFactory3D
         var r = go.GetComponent<Renderer>();
         if (r != null)
         {
-            var sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-            var mat = new Material(sh);
-            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", new Color(1f, 0.92f, 0.2f));
-            else mat.color = new Color(1f, 0.92f, 0.2f);
-            r.sharedMaterial = mat;
+            if (_bulletMaterial == null)
+            {
+                var sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+                _bulletMaterial = new Material(sh);
+                if (_bulletMaterial.HasProperty("_BaseColor")) _bulletMaterial.SetColor("_BaseColor", new Color(1f, 0.92f, 0.2f));
+                else _bulletMaterial.color = new Color(1f, 0.92f, 0.2f);
+            }
+            r.sharedMaterial = _bulletMaterial;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
         }
 
         Object.Destroy(go, 3f);

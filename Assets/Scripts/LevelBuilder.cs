@@ -1,16 +1,25 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class LevelBuilder : MonoBehaviour
 {
-    [SerializeField] int width = 42;
-    [SerializeField] int height = 28;
+    static Material _floorMat;
+    static Material _wallMat;
+    static Material _obstacleMat;
+    static Material _buildingMat;
+    static Material _roofMat;
+    static Material _chestBodyMat;
+    static Material _chestLidMat;
+
+    [SerializeField] int width = 56;
+    [SerializeField] int height = 38;
     [SerializeField] float cellSize = 1f;
     [SerializeField] float wallHeight = 2.2f;
 
     [SerializeField] int enemyCount = 10;
-    [SerializeField] int obstacleCount = 22;
-    [SerializeField] int buildingCount = 7;
-    [SerializeField] int chestCount = 14;
+    [SerializeField] int obstacleCount = 11;
+    [SerializeField] int buildingCount = 4;
+    [SerializeField] int chestCount = 7;
 
     void Awake()
     {
@@ -38,7 +47,7 @@ public class LevelBuilder : MonoBehaviour
         floor.transform.SetParent(root);
         floor.transform.position = center;
         floor.transform.localScale = new Vector3(w, 0.1f, h);
-        Paint(floor, new Color(0.1f, 0.12f, 0.18f));
+        Paint(floor, GetOrCreateMaterial(ref _floorMat, new Color(0.1f, 0.12f, 0.18f)));
 
         CreateWall(root, new Vector3(0f, wallHeight * 0.5f, h * 0.5f), new Vector3(w, wallHeight, 1.2f));
         CreateWall(root, new Vector3(0f, wallHeight * 0.5f, -h * 0.5f), new Vector3(w, wallHeight, 1.2f));
@@ -53,19 +62,33 @@ public class LevelBuilder : MonoBehaviour
         wall.transform.SetParent(parent);
         wall.transform.position = pos;
         wall.transform.localScale = scale;
-        Paint(wall, new Color(0.32f, 0.34f, 0.42f));
+        Paint(wall, GetOrCreateMaterial(ref _wallMat, new Color(0.32f, 0.34f, 0.42f)));
         wall.AddComponent<WallTag>();
     }
 
-    static void Paint(GameObject go, Color c)
+    static Material GetOrCreateMaterial(ref Material cache, Color c)
+    {
+        if (cache != null) return cache;
+        var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+        cache = new Material(shader);
+        if (cache.HasProperty("_BaseColor")) cache.SetColor("_BaseColor", c);
+        else cache.color = c;
+        return cache;
+    }
+
+    static void Paint(GameObject go, Material m)
+    {
+        var r = go.GetComponent<Renderer>();
+        if (r == null || m == null) return;
+        r.sharedMaterial = m;
+    }
+
+    static void DisableShadows(GameObject go)
     {
         var r = go.GetComponent<Renderer>();
         if (r == null) return;
-        var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-        var m = new Material(shader);
-        if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
-        else m.color = c;
-        r.sharedMaterial = m;
+        r.shadowCastingMode = ShadowCastingMode.Off;
+        r.receiveShadows = false;
     }
 
     void EnsurePlayer()
@@ -146,7 +169,8 @@ public class LevelBuilder : MonoBehaviour
             float sy = Random.Range(0.7f, 1.6f);
             float sz = Random.Range(0.6f, 1.2f);
             go.transform.localScale = new Vector3(sx, sy, sz);
-            Paint(go, new Color(0.26f, 0.28f, 0.33f));
+            Paint(go, GetOrCreateMaterial(ref _obstacleMat, new Color(0.26f, 0.28f, 0.33f)));
+            DisableShadows(go);
             go.AddComponent<WallTag>();
         }
     }
@@ -168,7 +192,7 @@ public class LevelBuilder : MonoBehaviour
             float d = Random.Range(2.4f, 4.2f);
             basePart.transform.position = new Vector3(p.x, h * 0.5f, p.z);
             basePart.transform.localScale = new Vector3(w, h, d);
-            Paint(basePart, new Color(0.22f, 0.24f, 0.3f));
+            Paint(basePart, GetOrCreateMaterial(ref _buildingMat, new Color(0.22f, 0.24f, 0.3f)));
             basePart.AddComponent<WallTag>();
 
             var roof = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -176,7 +200,8 @@ public class LevelBuilder : MonoBehaviour
             roof.transform.SetParent(basePart.transform);
             roof.transform.localPosition = new Vector3(0f, 0.55f, 0f);
             roof.transform.localScale = new Vector3(1.1f, 0.12f, 1.1f);
-            Paint(roof, new Color(0.38f, 0.4f, 0.45f));
+            Paint(roof, GetOrCreateMaterial(ref _roofMat, new Color(0.38f, 0.4f, 0.45f)));
+            DisableShadows(roof);
             roof.AddComponent<WallTag>();
         }
     }
@@ -199,7 +224,8 @@ public class LevelBuilder : MonoBehaviour
             body.transform.SetParent(chest.transform);
             body.transform.localPosition = Vector3.zero;
             body.transform.localScale = new Vector3(0.7f, 0.4f, 0.5f);
-            Paint(body, new Color(0.42f, 0.26f, 0.12f));
+            Paint(body, GetOrCreateMaterial(ref _chestBodyMat, new Color(0.42f, 0.26f, 0.12f)));
+            DisableShadows(body);
             body.AddComponent<WallTag>();
 
             var lid = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -207,7 +233,8 @@ public class LevelBuilder : MonoBehaviour
             lid.transform.SetParent(chest.transform);
             lid.transform.localPosition = new Vector3(0f, 0.26f, 0f);
             lid.transform.localScale = new Vector3(0.76f, 0.16f, 0.56f);
-            Paint(lid, new Color(0.55f, 0.34f, 0.15f));
+            Paint(lid, GetOrCreateMaterial(ref _chestLidMat, new Color(0.55f, 0.34f, 0.15f)));
+            DisableShadows(lid);
             lid.AddComponent<WallTag>();
         }
     }

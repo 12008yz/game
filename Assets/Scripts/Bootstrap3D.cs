@@ -5,6 +5,9 @@ public static class Bootstrap3D
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void EnsureSceneSetup()
     {
+        QualitySettings.vSyncCount = 0;
+        Application.targetFrameRate = 120;
+
         if (Object.FindFirstObjectByType<LevelBuilder>() == null)
         {
             var go = new GameObject("GeneratedLevel");
