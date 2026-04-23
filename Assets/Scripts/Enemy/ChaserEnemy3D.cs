@@ -4,16 +4,33 @@ public class ChaserEnemy3D : MonoBehaviour
 {
     [SerializeField] float speed = 2.3f;
     [SerializeField] float turnSpeed = 12f;
-    [SerializeField] int hp = 2;
+    [SerializeField] int hp = 1;
     [SerializeField] float bodyRadius = 0.32f;
     [SerializeField] float bodyHeight = 1f;
     [SerializeField] float skin = 0.03f;
+    [SerializeField] float attackAnimInterval = 0.35f;
+    [SerializeField] float attackPreviewDistance = 2.2f;
+    [SerializeField] string[] enemyResourcePaths =
+    {
+        "Assets/Ultimate Animated Character Pack - Nov 2019/FBX/Zombie_Male.fbx",
+        "Assets/Ultimate Animated Character Pack - Nov 2019/FBX/Goblin_Male.fbx",
+        "Assets/Ultimate Animated Character Pack - Nov 2019/FBX/Knight_Male.fbx",
+        "Assets/Ultimate Animated Character Pack - Nov 2019/FBX/Wizard.fbx",
+        "Assets/Ultimate Animated Character Pack - Nov 2019/FBX/Pirate_Male.fbx"
+    };
     Transform _player;
     CapsuleCollider _bodyCollider;
+    CharacterPlayableAnimator3D _visualAnimator;
+    int _maxHp;
+    Transform _hpRoot;
+    Transform _hpFill;
+    float _attackAnimTimer;
 
     void Awake()
     {
         EnsureVisual();
+        _maxHp = Mathf.Max(1, hp);
+        CreateHealthBar();
         _bodyCollider = gameObject.AddComponent<CapsuleCollider>();
         _bodyCollider.height = bodyHeight;
         _bodyCollider.radius = bodyRadius;
@@ -47,7 +64,19 @@ public class ChaserEnemy3D : MonoBehaviour
             Vector3 step = d.normalized * (speed * Time.deltaTime);
             MoveWithCollision(step);
             RotateTowards(d);
+            if (_visualAnimator != null)
+                _visualAnimator.SetMoveAmount(1f);
+
+            if (_visualAnimator != null && _attackAnimTimer <= 0f && d.sqrMagnitude <= attackPreviewDistance * attackPreviewDistance)
+            {
+                _visualAnimator.TriggerAttack();
+                _attackAnimTimer = attackAnimInterval;
+            }
         }
+
+        UpdateHealthBar();
+        if (_attackAnimTimer > 0f)
+            _attackAnimTimer -= Time.deltaTime;
     }
 
     void RotateTowards(Vector3 direction)
@@ -127,30 +156,130 @@ public class ChaserEnemy3D : MonoBehaviour
 
     void EnsureVisual()
     {
-        var prefab = Resources.Load<GameObject>("Kenney/ChaserModel");
+        var prefab = LoadRandomEnemyPrefab();
         if (prefab != null)
         {
             var m = Instantiate(prefab, transform);
             m.name = "Model";
             m.transform.localPosition = Vector3.zero;
             m.transform.localRotation = Quaternion.identity;
-            m.transform.localScale = Vector3.one * 0.45f;
+            m.transform.localScale = Vector3.one * 0.82f;
             foreach (var c in m.GetComponentsInChildren<Collider>(true))
                 Destroy(c);
+            if (m.GetComponent<Animator>() == null)
+                m.AddComponent<Animator>();
+            _visualAnimator = m.GetComponent<CharacterPlayableAnimator3D>();
+            if (_visualAnimator == null)
+                _visualAnimator = m.AddComponent<CharacterPlayableAnimator3D>();
             return;
         }
 
-        var cap = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-        cap.name = "Model";
-        cap.transform.SetParent(transform);
-        cap.transform.localPosition = new Vector3(0f, 0.35f, 0f);
-        cap.transform.localScale = Vector3.one * 0.5f;
-        Destroy(cap.GetComponent<Collider>());
+        var fallback = CreateFallbackModel();
+        fallback.name = "Model";
+        fallback.transform.SetParent(transform);
+        fallback.transform.localPosition = new Vector3(0f, 0.35f, 0f);
+        fallback.transform.localRotation = Quaternion.identity;
+        fallback.transform.localScale = Vector3.one * 0.5f;
+        Destroy(fallback.GetComponent<Collider>());
+    }
+
+    GameObject LoadRandomEnemyPrefab()
+    {
+        if (enemyResourcePaths == null || enemyResourcePaths.Length == 0) return null;
+        int start = Random.Range(0, enemyResourcePaths.Length);
+        for (int i = 0; i < enemyResourcePaths.Length; i++)
+        {
+            string path = enemyResourcePaths[(start + i) % enemyResourcePaths.Length];
+            if (string.IsNullOrWhiteSpace(path)) continue;
+            var prefab = RuntimePrefabLoader3D.Load(path);
+            if (prefab != null) return prefab;
+        }
+        return null;
+    }
+
+    GameObject CreateFallbackModel()
+    {
+        PrimitiveType primitive = PrimitiveType.Capsule;
+        int roll = Random.Range(0, 3);
+        if (roll == 1) primitive = PrimitiveType.Cube;
+        else if (roll == 2) primitive = PrimitiveType.Sphere;
+
+        var go = GameObject.CreatePrimitive(primitive);
+        var renderer = go.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            var material = new Material(shader);
+            Color[] palette =
+            {
+                new Color(0.6f, 0.2f, 0.2f),
+                new Color(0.5f, 0.22f, 0.38f),
+                new Color(0.45f, 0.34f, 0.18f),
+                new Color(0.28f, 0.48f, 0.22f)
+            };
+            Color c = palette[Random.Range(0, palette.Length)];
+            if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", c);
+            else material.color = c;
+            renderer.sharedMaterial = material;
+        }
+
+        return go;
+    }
+
+    void CreateHealthBar()
+    {
+        _hpRoot = new GameObject("HpBar").transform;
+        _hpRoot.SetParent(transform);
+        _hpRoot.localPosition = new Vector3(0f, bodyHeight + 0.45f, 0f);
+        _hpRoot.localRotation = Quaternion.identity;
+
+        var bg = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        bg.name = "Bg";
+        bg.transform.SetParent(_hpRoot);
+        bg.transform.localPosition = Vector3.zero;
+        bg.transform.localScale = new Vector3(0.72f, 0.08f, 0.04f);
+        Destroy(bg.GetComponent<Collider>());
+        PaintHealthPart(bg, new Color(0.18f, 0.18f, 0.18f));
+
+        var fill = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        fill.name = "Fill";
+        fill.transform.SetParent(_hpRoot);
+        fill.transform.localPosition = new Vector3(-0.18f, 0f, -0.01f);
+        fill.transform.localScale = new Vector3(0.68f, 0.05f, 0.03f);
+        Destroy(fill.GetComponent<Collider>());
+        PaintHealthPart(fill, new Color(0.16f, 0.82f, 0.24f));
+        _hpFill = fill.transform;
+    }
+
+    static void PaintHealthPart(GameObject go, Color color)
+    {
+        var renderer = go.GetComponent<Renderer>();
+        if (renderer == null) return;
+        var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+        var material = new Material(shader);
+        if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
+        else material.color = color;
+        renderer.sharedMaterial = material;
+        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        renderer.receiveShadows = false;
+    }
+
+    void UpdateHealthBar()
+    {
+        if (_hpRoot == null || _hpFill == null) return;
+        var cam = Camera.main;
+        if (cam != null)
+            _hpRoot.rotation = cam.transform.rotation;
+
+        float t = Mathf.Clamp01((float)hp / _maxHp);
+        _hpFill.localScale = new Vector3(0.68f * t, 0.05f, 0.03f);
+        _hpFill.localPosition = new Vector3((-0.34f + (0.68f * t) * 0.5f), 0f, -0.01f);
     }
 
     public void TakeHit()
     {
         hp--;
+        UpdateHealthBar();
         if (hp > 0) return;
         if (GameManager3D.Instance != null) GameManager3D.Instance.NotifyEnemyKilled();
         Destroy(gameObject);
@@ -160,6 +289,13 @@ public class ChaserEnemy3D : MonoBehaviour
     {
         var p = collision.gameObject.GetComponent<PlayerController3D>();
         if (p != null && GameManager3D.Instance != null)
+        {
+            if (_visualAnimator != null && _attackAnimTimer <= 0f)
+            {
+                _visualAnimator.TriggerAttack();
+                _attackAnimTimer = attackAnimInterval;
+            }
             GameManager3D.Instance.NotifyPlayerDied();
+        }
     }
 }

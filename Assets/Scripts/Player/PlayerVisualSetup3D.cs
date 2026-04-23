@@ -2,13 +2,13 @@ using UnityEngine;
 
 public class PlayerVisualSetup3D : MonoBehaviour
 {
-    [SerializeField] string heroResourcePath = "Models/character-r";
+    [SerializeField] string heroResourcePath = "Assets/Ultimate Animated Character Pack - Nov 2019/FBX/Ninja_Male.fbx";
     [SerializeField] string weaponResourcePath = "Models/blaster-e";
     [SerializeField] string heroTextureResourcePath = "Models/texture-r";
 
     [SerializeField] Vector3 heroPos = new Vector3(0f, 0f, 0f);
     [SerializeField] Vector3 heroRot = new Vector3(0f, 0f, 0f);
-    [SerializeField] Vector3 heroScale = Vector3.one;
+    [SerializeField] Vector3 heroScale = new Vector3(0.9f, 0.9f, 0.9f);
 
     [SerializeField] Vector3 weaponPos = new Vector3(0.16f, 0.88f, 0.18f);
     [SerializeField] Vector3 weaponRot = new Vector3(8f, 95f, -6f);
@@ -18,14 +18,20 @@ public class PlayerVisualSetup3D : MonoBehaviour
     {
         RemoveLegacy();
 
-        var hero = Ensure("HeroModel", Resources.Load<GameObject>(heroResourcePath), transform, heroPos, heroRot, heroScale);
+        var hero = Ensure("HeroModel", RuntimePrefabLoader3D.Load(heroResourcePath), transform, heroPos, heroRot, heroScale);
         var weaponParent = hero != null ? FindWeaponAnchor(hero.transform) : transform;
-        Ensure("WeaponModel", Resources.Load<GameObject>(weaponResourcePath), weaponParent, weaponPos, weaponRot, weaponScale);
+        var weapon = Ensure("WeaponModel", RuntimePrefabLoader3D.Load(weaponResourcePath), weaponParent, weaponPos, weaponRot, weaponScale);
+        if (weapon != null && weapon.GetComponent<WeaponKickAnimator3D>() == null)
+            weapon.AddComponent<WeaponKickAnimator3D>();
 
         if (hero != null)
         {
             ApplyHeroTexture(hero.transform);
             AlignHeroFeetToGround(hero.transform);
+            if (hero.GetComponent<Animator>() == null)
+                hero.AddComponent<Animator>();
+            if (hero.GetComponent<CharacterPlayableAnimator3D>() == null)
+                hero.AddComponent<CharacterPlayableAnimator3D>();
         }
     }
 

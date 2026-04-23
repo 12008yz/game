@@ -23,7 +23,7 @@ public class Bullet3D : MonoBehaviour
         {
             if (Physics.SphereCast(current, _radius, _dir, out RaycastHit hit, distance, ~0, QueryTriggerInteraction.Collide))
             {
-                if (ProcessHit(hit.collider))
+                if (ProcessHit(hit.collider, hit.point))
                     return;
             }
         }
@@ -33,10 +33,11 @@ public class Bullet3D : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
-        ProcessHit(other);
+        Vector3 hitPoint = other != null ? other.ClosestPoint(transform.position) : transform.position;
+        ProcessHit(other, hitPoint);
     }
 
-    bool ProcessHit(Collider other)
+    bool ProcessHit(Collider other, Vector3 hitPoint)
     {
         if (other == null) return false;
 
@@ -46,6 +47,7 @@ public class Bullet3D : MonoBehaviour
         var enemy = other.GetComponentInParent<ChaserEnemy3D>();
         if (enemy != null)
         {
+            HitExplosionFx3D.Spawn(hitPoint + Vector3.up * 0.1f);
             enemy.TakeHit();
             Destroy(gameObject);
             return true;

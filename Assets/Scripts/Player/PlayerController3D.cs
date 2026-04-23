@@ -8,21 +8,37 @@ public class PlayerController3D : MonoBehaviour
     [SerializeField] float fireCooldown = 0.18f;
     [SerializeField] float bulletSpeed = 22f;
     [SerializeField] float muzzleOffset = 0.8f;
+    [SerializeField] int maxAmmo = 20;
 
     CharacterController _cc;
+    CharacterPlayableAnimator3D _visualAnimator;
+    WeaponKickAnimator3D _weaponKick;
     float _cooldown;
     Vector3 _aimDirection = Vector3.forward;
+    int _ammoRemaining;
 
     public Vector3 AimDirection => _aimDirection;
+    public float MoveSpeed => moveSpeed;
+    public float FireCooldown => fireCooldown;
+    public float BulletSpeed => bulletSpeed;
+    public int MaxAmmo => maxAmmo;
+    public int AmmoRemaining => _ammoRemaining;
 
     void Awake()
     {
         _cc = GetComponent<CharacterController>();
+        _ammoRemaining = Mathf.Max(0, maxAmmo);
+    }
+
+    void Start()
+    {
+        _visualAnimator = GetComponentInChildren<CharacterPlayableAnimator3D>();
+        _weaponKick = GetComponentInChildren<WeaponKickAnimator3D>();
     }
 
     void Update()
     {
-        if (GameManager3D.Instance != null && GameManager3D.Instance.GameOver)
+        if (GameManager3D.Instance != null && (!GameManager3D.Instance.GameStarted || GameManager3D.Instance.GameOver))
             return;
 
         Move();
@@ -36,6 +52,8 @@ public class PlayerController3D : MonoBehaviour
         if (input.sqrMagnitude > 1f) input.Normalize();
         Vector3 delta = new Vector3(input.x, 0f, input.y) * (moveSpeed * Time.deltaTime);
         _cc.Move(delta);
+        if (_visualAnimator != null)
+            _visualAnimator.SetMoveAmount(input.magnitude);
     }
 
     void AimToMouse()
@@ -62,11 +80,34 @@ public class PlayerController3D : MonoBehaviour
         _cooldown -= Time.deltaTime;
         bool fire = Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space);
         if (!fire || _cooldown > 0f) return;
+        if (_ammoRemaining <= 0) return;
 
         Vector3 origin = transform.position;
         origin.y = 0.35f;
         Vector3 spawn = origin + _aimDirection * muzzleOffset;
         BulletFactory3D.Spawn(spawn, _aimDirection, bulletSpeed);
         _cooldown = fireCooldown;
+        _ammoRemaining--;
+        if (_visualAnimator != null)
+            _visualAnimator.TriggerAttack();
+        if (_weaponKick != null)
+            _weaponKick.TriggerKick();
+    }
+
+    public void ApplyUpgrade(string upgradeId)
+    {
+        if (string.IsNullOrEmpty(upgradeId)) return;
+        switch (upgradeId)
+        {
+            case "move_speed":
+                moveSpeed = Mathf.Min(moveSpeed * 1.15f, 14f);
+                break;
+            case "fire_rate":
+                fireCooldown = Mathf.Max(fireCooldown * 0.82f, 0.06f);
+                break;
+            case "bullet_speed":
+                bulletSpeed = Mathf.Min(bulletSpeed * 1.2f, 48f);
+                break;
+        }
     }
 }

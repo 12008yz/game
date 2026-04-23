@@ -6,7 +6,14 @@ public static class Bootstrap3D
     static void EnsureSceneSetup()
     {
         QualitySettings.vSyncCount = 0;
-        Application.targetFrameRate = 120;
+        Application.targetFrameRate = 75;
+        QualitySettings.antiAliasing = 0;
+        QualitySettings.pixelLightCount = 1;
+        QualitySettings.shadowResolution = ShadowResolution.Low;
+        QualitySettings.shadowDistance = 24f;
+        QualitySettings.shadows = ShadowQuality.HardOnly;
+        QualitySettings.realtimeReflectionProbes = false;
+        QualitySettings.softParticles = false;
 
         if (Object.FindFirstObjectByType<LevelBuilder>() == null)
         {

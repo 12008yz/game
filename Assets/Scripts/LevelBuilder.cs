@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Rendering;
+using System.Collections.Generic;
 
 public class LevelBuilder : MonoBehaviour
 {
@@ -11,12 +12,14 @@ public class LevelBuilder : MonoBehaviour
     static Material _chestBodyMat;
     static Material _chestLidMat;
 
-    [SerializeField] int width = 56;
-    [SerializeField] int height = 38;
+    [SerializeField] int width = 48;
+    [SerializeField] int height = 32;
     [SerializeField] float cellSize = 1f;
     [SerializeField] float wallHeight = 2.2f;
 
     [SerializeField] int enemyCount = 10;
+    public int BaseEnemyCount => enemyCount;
+
     [SerializeField] int obstacleCount = 11;
     [SerializeField] int buildingCount = 4;
     [SerializeField] int chestCount = 7;
@@ -30,7 +33,6 @@ public class LevelBuilder : MonoBehaviour
         EnsurePlayer();
         EnsureCamera();
         EnsureLight();
-        SpawnEnemies();
     }
 
     void BuildArena()
@@ -118,6 +120,9 @@ public class LevelBuilder : MonoBehaviour
             cam.farClipPlane = 200f;
             cam.fieldOfView = 50f;
         }
+        cam.allowHDR = false;
+        cam.allowMSAA = false;
+        cam.useOcclusionCulling = false;
 
         var follow = cam.GetComponent<CameraFollow3D>();
         if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow3D>();
@@ -136,17 +141,22 @@ public class LevelBuilder : MonoBehaviour
         var go = new GameObject("Directional Light");
         var light = go.AddComponent<Light>();
         light.type = LightType.Directional;
-        light.intensity = 1.2f;
+        light.intensity = 1.05f;
+        light.shadows = LightShadows.Hard;
+        light.shadowStrength = 0.7f;
+        light.shadowBias = 0.08f;
+        light.shadowNormalBias = 0.4f;
         go.transform.rotation = Quaternion.Euler(50f, -35f, 0f);
     }
 
-    void SpawnEnemies()
+    public void SpawnEnemyWave(int count)
     {
-        if (FindObjectsByType<ChaserEnemy3D>(FindObjectsSortMode.None).Length > 0) return;
-
-        for (int i = 0; i < enemyCount; i++)
+        int safeCount = Mathf.Max(1, count);
+        var wavePositions = new List<Vector3>(safeCount);
+        for (int i = 0; i < safeCount; i++)
         {
-            Vector3 p = RandomEnemySpawn(2.5f);
+            Vector3 p = RandomEnemySpawn(2.5f, wavePositions);
+            wavePositions.Add(p);
             var e = new GameObject("Enemy");
             e.transform.position = p;
             e.AddComponent<ChaserEnemy3D>();
@@ -254,22 +264,77 @@ public class LevelBuilder : MonoBehaviour
         return Vector3.zero;
     }
 
-    Vector3 RandomEnemySpawn(float padding)
+    Vector3 RandomEnemySpawn(float padding, List<Vector3> reservedPositions)
     {
         float radius = 0.32f;
         float height = 1f;
         float half = Mathf.Max(height * 0.5f - radius, 0.01f);
+        var player = FindFirstObjectByType<PlayerController3D>();
+        Vector3 playerPos = player != null ? player.transform.position : Vector3.zero;
+        float minDistanceFromPlayer = 6f;
+        float minDistanceBetweenEnemies = 2.2f;
+        float halfW = width * cellSize * 0.5f - padding;
+        float halfH = height * cellSize * 0.5f - padding;
 
-        for (int i = 0; i < 48; i++)
+        for (int i = 0; i < 90; i++)
         {
-            Vector3 p = RandomGroundPos(padding);
+            Vector3 p;
+            if (Random.value < 0.75f)
+            {
+                bool alongX = Random.value < 0.5f;
+                if (alongX)
+                {
+                    float x = (Random.value < 0.5f ? -halfW : halfW) + Random.Range(-1.8f, 1.8f);
+                    float z = Random.Range(-halfH, halfH);
+                    p = new Vector3(x, 0f, z);
+                }
+                else
+                {
+                    float x = Random.Range(-halfW, halfW);
+                    float z = (Random.value < 0.5f ? -halfH : halfH) + Random.Range(-1.8f, 1.8f);
+                    p = new Vector3(x, 0f, z);
+                }
+            }
+            else
+            {
+                p = RandomGroundPos(padding);
+            }
+
+            p.x = Mathf.Clamp(p.x, -halfW, halfW);
+            p.z = Mathf.Clamp(p.z, -halfH, halfH);
+
+            if ((p - playerPos).sqrMagnitude < minDistanceFromPlayer * minDistanceFromPlayer)
+                continue;
+            if (!IsFarFromReserved(p, reservedPositions, minDistanceBetweenEnemies))
+                continue;
+
             Vector3 p1 = p + Vector3.up * radius;
             Vector3 p2 = p1 + Vector3.up * (half * 2f);
             if (!Physics.CheckCapsule(p1, p2, radius, ~0, QueryTriggerInteraction.Ignore))
                 return p;
         }
 
-        return RandomGroundPos(padding);
+        for (int i = 0; i < 40; i++)
+        {
+            Vector3 fallback = RandomGroundPos(padding);
+            if ((fallback - playerPos).sqrMagnitude < minDistanceFromPlayer * minDistanceFromPlayer) continue;
+            if (!IsFarFromReserved(fallback, reservedPositions, minDistanceBetweenEnemies)) continue;
+            return fallback;
+        }
+
+        return playerPos + new Vector3(Random.Range(-halfW, halfW), 0f, Random.Range(-halfH, halfH));
+    }
+
+    static bool IsFarFromReserved(Vector3 p, List<Vector3> reserved, float minDistance)
+    {
+        if (reserved == null || reserved.Count == 0) return true;
+        float sq = minDistance * minDistance;
+        for (int i = 0; i < reserved.Count; i++)
+        {
+            if ((reserved[i] - p).sqrMagnitude < sq)
+                return false;
+        }
+        return true;
     }
 }
 
