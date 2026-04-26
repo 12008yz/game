@@ -5,6 +5,7 @@ public class GameManager3D : MonoBehaviour
 {
     public static GameManager3D Instance { get; private set; }
 
+    [SerializeField] GameBalance3D balance;
     [SerializeField] int desiredTotalEnemies = 18;
     [SerializeField] int maxAliveAtOnce = 6;
     [SerializeField] int spawnBatchMin = 3;
@@ -19,6 +20,10 @@ public class GameManager3D : MonoBehaviour
     int _spawnedEnemies;
     int _targetTotalEnemies;
     float _introTimer;
+    float _cachedRefsRefreshTimer;
+    float _loseCheckTimer;
+    PlayerController3D _player;
+    LevelBuilder _level;
 
     public bool GameOver => _gameOver;
     public bool GameStarted => _gameStarted;
@@ -42,8 +47,16 @@ public class GameManager3D : MonoBehaviour
 
     void Start()
     {
+        if (balance == null)
+            balance = Resources.Load<GameBalance3D>("GameBalance3D");
+        if (balance != null)
+        {
+            desiredTotalEnemies = balance.desiredTotalEnemies;
+            maxAliveAtOnce = balance.maxAliveAtOnce;
+        }
         Time.timeScale = 0f;
         _introTimer = introMessageDuration;
+        RefreshCachedReferences(force: true);
         ConfigureEnemyBudget();
     }
 
@@ -86,13 +99,21 @@ public class GameManager3D : MonoBehaviour
         if (_introTimer > 0f)
             _introTimer -= Time.deltaTime;
 
+        _cachedRefsRefreshTimer -= Time.deltaTime;
+        if (_cachedRefsRefreshTimer <= 0f)
+            RefreshCachedReferences(force: false);
+
         TrySpawnEnemies();
 
-        var player = FindFirstObjectByType<PlayerController3D>();
-        if (!_portalSpawned && player != null && player.AmmoRemaining <= 0 && AliveEnemiesCount() > 0)
+        _loseCheckTimer -= Time.deltaTime;
+        if (_loseCheckTimer <= 0f)
         {
-            _gameOver = true;
-            _win = false;
+            _loseCheckTimer = 0.15f;
+            if (!_portalSpawned && _player != null && _player.AmmoRemaining <= 0 && AliveEnemiesCount() > 0)
+            {
+                _gameOver = true;
+                _win = false;
+            }
         }
     }
 
@@ -107,8 +128,7 @@ public class GameManager3D : MonoBehaviour
 
     void ConfigureEnemyBudget()
     {
-        var player = FindFirstObjectByType<PlayerController3D>();
-        int ammoCap = player != null ? player.MaxAmmo : 20;
+        int ammoCap = _player != null ? _player.MaxAmmo : 20;
         int safeMax = Mathf.Max(1, ammoCap - 2);
         _targetTotalEnemies = Mathf.Clamp(desiredTotalEnemies, 8, safeMax);
     }
@@ -127,10 +147,9 @@ public class GameManager3D : MonoBehaviour
         batch = Mathf.Min(batch, maxAliveAtOnce - alive);
         if (batch <= 0) return;
 
-        var level = FindFirstObjectByType<LevelBuilder>();
-        if (level == null) return;
+        if (_level == null) return;
 
-        level.SpawnEnemyWave(batch);
+        _level.SpawnEnemyWave(batch);
         _spawnedEnemies += batch;
     }
 
@@ -139,8 +158,7 @@ public class GameManager3D : MonoBehaviour
         if (_portalSpawned) return;
         _portalSpawned = true;
 
-        var player = FindFirstObjectByType<PlayerController3D>();
-        Vector3 pos = player != null ? player.transform.position + player.transform.forward * 3f : new Vector3(0f, 0f, 0f);
+        Vector3 pos = _player != null ? _player.transform.position + _player.transform.forward * 3f : new Vector3(0f, 0f, 0f);
         pos.y = 0f;
 
         var go = new GameObject("VictoryPortal");
@@ -155,9 +173,27 @@ public class GameManager3D : MonoBehaviour
         _win = true;
     }
 
+    public bool SpawnDebugWave(int count)
+    {
+        if (!_gameStarted || _gameOver) return false;
+        if (_level == null) return false;
+        int safeCount = Mathf.Clamp(count, 1, 48);
+        _level.SpawnEnemyWave(safeCount);
+        return true;
+    }
+
     int AliveEnemiesCount()
     {
-        return FindObjectsByType<ChaserEnemy3D>(FindObjectsSortMode.None).Length;
+        return EnemyRegistry3D.AliveCount;
+    }
+
+    void RefreshCachedReferences(bool force)
+    {
+        _cachedRefsRefreshTimer = force ? 0.75f : 1f;
+        if (_player == null)
+            _player = FindFirstObjectByType<PlayerController3D>();
+        if (_level == null)
+            _level = FindFirstObjectByType<LevelBuilder>();
     }
 
     void OnDestroy()

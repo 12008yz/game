@@ -3,6 +3,7 @@ using UnityEngine;
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController3D : MonoBehaviour
 {
+    [SerializeField] GameBalance3D balance;
     [SerializeField] float moveSpeed = 7f;
     [SerializeField] float rotateLerp = 20f;
     [SerializeField] float fireCooldown = 0.18f;
@@ -26,6 +27,15 @@ public class PlayerController3D : MonoBehaviour
 
     void Awake()
     {
+        if (balance == null)
+            balance = Resources.Load<GameBalance3D>("GameBalance3D");
+        if (balance != null)
+        {
+            moveSpeed = balance.playerMoveSpeed;
+            fireCooldown = balance.playerFireCooldown;
+            bulletSpeed = balance.playerBulletSpeed;
+            maxAmmo = balance.playerMaxAmmo;
+        }
         _cc = GetComponent<CharacterController>();
         _ammoRemaining = Mathf.Max(0, maxAmmo);
     }

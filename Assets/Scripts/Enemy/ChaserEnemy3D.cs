@@ -2,6 +2,7 @@ using UnityEngine;
 
 public class ChaserEnemy3D : MonoBehaviour
 {
+    [SerializeField] GameBalance3D balance;
     [SerializeField] float speed = 2.3f;
     [SerializeField] float turnSpeed = 12f;
     [SerializeField] int hp = 1;
@@ -25,9 +26,20 @@ public class ChaserEnemy3D : MonoBehaviour
     Transform _hpRoot;
     Transform _hpFill;
     float _attackAnimTimer;
+    float _nextOverlapResolveTime;
+    float _overlapInterval;
 
     void Awake()
     {
+        if (balance == null)
+            balance = Resources.Load<GameBalance3D>("GameBalance3D");
+        if (balance != null)
+        {
+            speed = balance.enemyMoveSpeed;
+            hp = balance.enemyHp;
+        }
+        _overlapInterval = Random.Range(0.08f, 0.16f);
+        _nextOverlapResolveTime = Time.time + Random.Range(0f, _overlapInterval);
         EnsureVisual();
         _maxHp = Mathf.Max(1, hp);
         CreateHealthBar();
@@ -48,12 +60,26 @@ public class ChaserEnemy3D : MonoBehaviour
         _player = p != null ? p.transform : null;
     }
 
+    void OnEnable()
+    {
+        EnemyRegistry3D.Register(this);
+    }
+
+    void OnDisable()
+    {
+        EnemyRegistry3D.Unregister(this);
+    }
+
     void Update()
     {
         if (_player == null) return;
         if (GameManager3D.Instance != null && GameManager3D.Instance.GameOver) return;
 
-        ResolveOverlaps();
+        if (Time.time >= _nextOverlapResolveTime)
+        {
+            _nextOverlapResolveTime = Time.time + _overlapInterval;
+            ResolveOverlaps();
+        }
 
         Vector3 pos = transform.position;
         Vector3 target = _player.position;

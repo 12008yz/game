@@ -4,6 +4,7 @@ using System.Collections.Generic;
 
 public class LevelBuilder : MonoBehaviour
 {
+    public static LevelBuilder Instance { get; private set; }
     static Material _floorMat;
     static Material _wallMat;
     static Material _obstacleMat;
@@ -23,9 +24,11 @@ public class LevelBuilder : MonoBehaviour
     [SerializeField] int obstacleCount = 11;
     [SerializeField] int buildingCount = 4;
     [SerializeField] int chestCount = 7;
+    PlayerController3D _player;
 
     void Awake()
     {
+        Instance = this;
         BuildArena();
         SpawnObstacles();
         SpawnBuildings();
@@ -50,6 +53,7 @@ public class LevelBuilder : MonoBehaviour
         floor.transform.position = center;
         floor.transform.localScale = new Vector3(w, 0.1f, h);
         Paint(floor, GetOrCreateMaterial(ref _floorMat, new Color(0.1f, 0.12f, 0.18f)));
+        floor.isStatic = true;
 
         CreateWall(root, new Vector3(0f, wallHeight * 0.5f, h * 0.5f), new Vector3(w, wallHeight, 1.2f));
         CreateWall(root, new Vector3(0f, wallHeight * 0.5f, -h * 0.5f), new Vector3(w, wallHeight, 1.2f));
@@ -66,6 +70,7 @@ public class LevelBuilder : MonoBehaviour
         wall.transform.localScale = scale;
         Paint(wall, GetOrCreateMaterial(ref _wallMat, new Color(0.32f, 0.34f, 0.42f)));
         wall.AddComponent<WallTag>();
+        wall.isStatic = true;
     }
 
     static Material GetOrCreateMaterial(ref Material cache, Color c)
@@ -73,6 +78,7 @@ public class LevelBuilder : MonoBehaviour
         if (cache != null) return cache;
         var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
         cache = new Material(shader);
+        cache.enableInstancing = true;
         if (cache.HasProperty("_BaseColor")) cache.SetColor("_BaseColor", c);
         else cache.color = c;
         return cache;
@@ -106,6 +112,7 @@ public class LevelBuilder : MonoBehaviour
 
         p.AddComponent<PlayerController3D>();
         p.AddComponent<PlayerVisualSetup3D>();
+        _player = p.GetComponent<PlayerController3D>();
     }
 
     void EnsureCamera()
@@ -126,8 +133,8 @@ public class LevelBuilder : MonoBehaviour
 
         var follow = cam.GetComponent<CameraFollow3D>();
         if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow3D>();
-        var player = FindFirstObjectByType<PlayerController3D>();
-        if (player != null) follow.target = player.transform;
+        if (_player == null) _player = FindFirstObjectByType<PlayerController3D>();
+        if (_player != null) follow.target = _player.transform;
     }
 
     void EnsureLight()
@@ -182,6 +189,7 @@ public class LevelBuilder : MonoBehaviour
             Paint(go, GetOrCreateMaterial(ref _obstacleMat, new Color(0.26f, 0.28f, 0.33f)));
             DisableShadows(go);
             go.AddComponent<WallTag>();
+            go.isStatic = true;
         }
     }
 
@@ -204,6 +212,7 @@ public class LevelBuilder : MonoBehaviour
             basePart.transform.localScale = new Vector3(w, h, d);
             Paint(basePart, GetOrCreateMaterial(ref _buildingMat, new Color(0.22f, 0.24f, 0.3f)));
             basePart.AddComponent<WallTag>();
+            basePart.isStatic = true;
 
             var roof = GameObject.CreatePrimitive(PrimitiveType.Cube);
             roof.name = "Roof";
@@ -213,6 +222,7 @@ public class LevelBuilder : MonoBehaviour
             Paint(roof, GetOrCreateMaterial(ref _roofMat, new Color(0.38f, 0.4f, 0.45f)));
             DisableShadows(roof);
             roof.AddComponent<WallTag>();
+            roof.isStatic = true;
         }
     }
 
@@ -237,6 +247,7 @@ public class LevelBuilder : MonoBehaviour
             Paint(body, GetOrCreateMaterial(ref _chestBodyMat, new Color(0.42f, 0.26f, 0.12f)));
             DisableShadows(body);
             body.AddComponent<WallTag>();
+            body.isStatic = true;
 
             var lid = GameObject.CreatePrimitive(PrimitiveType.Cube);
             lid.name = "Lid";
@@ -246,6 +257,7 @@ public class LevelBuilder : MonoBehaviour
             Paint(lid, GetOrCreateMaterial(ref _chestLidMat, new Color(0.55f, 0.34f, 0.15f)));
             DisableShadows(lid);
             lid.AddComponent<WallTag>();
+            lid.isStatic = true;
         }
     }
 
@@ -269,8 +281,8 @@ public class LevelBuilder : MonoBehaviour
         float radius = 0.32f;
         float height = 1f;
         float half = Mathf.Max(height * 0.5f - radius, 0.01f);
-        var player = FindFirstObjectByType<PlayerController3D>();
-        Vector3 playerPos = player != null ? player.transform.position : Vector3.zero;
+        if (_player == null) _player = FindFirstObjectByType<PlayerController3D>();
+        Vector3 playerPos = _player != null ? _player.transform.position : Vector3.zero;
         float minDistanceFromPlayer = 6f;
         float minDistanceBetweenEnemies = 2.2f;
         float halfW = width * cellSize * 0.5f - padding;
@@ -335,6 +347,12 @@ public class LevelBuilder : MonoBehaviour
                 return false;
         }
         return true;
+    }
+
+    void OnDestroy()
+    {
+        if (Instance == this)
+            Instance = null;
     }
 }
 

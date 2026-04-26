@@ -4,38 +4,28 @@ using UnityEngine.Rendering;
 public class HitExplosionFx3D : MonoBehaviour
 {
     static Material _fxMaterial;
+    static readonly System.Collections.Generic.Stack<HitExplosionFx3D> _pool = new System.Collections.Generic.Stack<HitExplosionFx3D>(64);
+    static bool _prewarmed;
     float _time;
     float _duration;
     Color _baseColor;
+    Renderer _renderer;
+    MaterialPropertyBlock _mpb;
+    Vector3 _baseScale;
 
     public static void Spawn(Vector3 worldPos, float size = 0.42f, float duration = 0.12f)
     {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        go.name = "HitFx";
+        EnsurePrewarmed();
+        var fx = _pool.Count > 0 ? _pool.Pop() : CreateFx();
+        var go = fx.gameObject;
+        go.SetActive(true);
         go.transform.position = worldPos;
         go.transform.localScale = Vector3.one * Mathf.Max(0.1f, size);
-        Object.Destroy(go.GetComponent<Collider>());
+        fx._baseScale = go.transform.localScale;
 
-        var fx = go.AddComponent<HitExplosionFx3D>();
         fx._duration = Mathf.Max(0.05f, duration);
         fx._baseColor = new Color(1f, 0.75f, 0.2f, 1f);
-
-        var r = go.GetComponent<Renderer>();
-        if (r != null)
-        {
-            if (_fxMaterial == null)
-            {
-                var sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-                _fxMaterial = new Material(sh);
-            }
-
-            var inst = new Material(_fxMaterial);
-            if (inst.HasProperty("_BaseColor")) inst.SetColor("_BaseColor", fx._baseColor);
-            else inst.color = fx._baseColor;
-            r.sharedMaterial = inst;
-            r.shadowCastingMode = ShadowCastingMode.Off;
-            r.receiveShadows = false;
-        }
+        fx._time = 0f;
     }
 
     void Update()
@@ -44,26 +34,65 @@ public class HitExplosionFx3D : MonoBehaviour
         float t = Mathf.Clamp01(_time / _duration);
 
         float scale = Mathf.Lerp(1f, 2.4f, t);
-        transform.localScale *= (1f + Time.deltaTime * 10f);
-        if (transform.localScale.x > scale) transform.localScale = Vector3.one * scale;
+        transform.localScale = _baseScale * scale;
 
-        var r = GetComponent<Renderer>();
-        if (r != null && r.sharedMaterial != null)
+        if (_renderer != null)
         {
             Color c = _baseColor;
             c.a = 1f - t;
-            if (r.sharedMaterial.HasProperty("_BaseColor")) r.sharedMaterial.SetColor("_BaseColor", c);
-            else r.sharedMaterial.color = c;
+            _mpb.SetColor("_BaseColor", c);
+            _renderer.SetPropertyBlock(_mpb);
         }
 
         if (_time >= _duration)
-            Destroy(gameObject);
+            ReleaseToPool();
     }
 
-    void OnDestroy()
+    static void EnsurePrewarmed()
     {
-        var r = GetComponent<Renderer>();
-        if (r != null && r.sharedMaterial != null)
-            Destroy(r.sharedMaterial);
+        if (_prewarmed) return;
+        _prewarmed = true;
+        for (int i = 0; i < 28; i++)
+        {
+            var fx = CreateFx();
+            fx.gameObject.SetActive(false);
+            _pool.Push(fx);
+        }
+    }
+
+    static HitExplosionFx3D CreateFx()
+    {
+        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        go.name = "HitFx";
+        Object.Destroy(go.GetComponent<Collider>());
+        var fx = go.AddComponent<HitExplosionFx3D>();
+
+        var r = go.GetComponent<Renderer>();
+        if (r != null)
+        {
+            if (_fxMaterial == null)
+            {
+                var sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+                _fxMaterial = new Material(sh);
+                _fxMaterial.enableInstancing = true;
+            }
+            r.sharedMaterial = _fxMaterial;
+            r.shadowCastingMode = ShadowCastingMode.Off;
+            r.receiveShadows = false;
+        }
+        return fx;
+    }
+
+    void Awake()
+    {
+        _renderer = GetComponent<Renderer>();
+        _mpb = new MaterialPropertyBlock();
+    }
+
+    void ReleaseToPool()
+    {
+        if (!gameObject.activeSelf) return;
+        gameObject.SetActive(false);
+        _pool.Push(this);
     }
 }

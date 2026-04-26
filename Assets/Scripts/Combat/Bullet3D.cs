@@ -5,16 +5,27 @@ public class Bullet3D : MonoBehaviour
     Vector3 _dir;
     float _speed;
     float _radius;
+    float _lifeLeft;
+    System.Action<Bullet3D> _releaseToPool;
 
-    public void Init(Vector3 direction, float speed)
+    public void Init(Vector3 direction, float speed, float lifeSeconds, System.Action<Bullet3D> releaseToPool)
     {
         _dir = direction.normalized;
         _speed = speed;
         _radius = Mathf.Max(0.06f, transform.localScale.x * 0.5f);
+        _lifeLeft = Mathf.Max(0.1f, lifeSeconds);
+        _releaseToPool = releaseToPool;
     }
 
     void Update()
     {
+        _lifeLeft -= Time.deltaTime;
+        if (_lifeLeft <= 0f)
+        {
+            Release();
+            return;
+        }
+
         Vector3 current = transform.position;
         Vector3 step = _dir * (_speed * Time.deltaTime);
         float distance = step.magnitude;
@@ -49,16 +60,24 @@ public class Bullet3D : MonoBehaviour
         {
             HitExplosionFx3D.Spawn(hitPoint + Vector3.up * 0.1f);
             enemy.TakeHit();
-            Destroy(gameObject);
+            Release();
             return true;
         }
 
         if (other.GetComponent<WallTag>() != null)
         {
-            Destroy(gameObject);
+            Release();
             return true;
         }
 
         return false;
+    }
+
+    void Release()
+    {
+        if (_releaseToPool != null)
+            _releaseToPool(this);
+        else
+            gameObject.SetActive(false);
     }
 }
