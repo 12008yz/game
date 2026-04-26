@@ -14,6 +14,7 @@ public class PlayerController3D : MonoBehaviour
     CharacterController _cc;
     CharacterPlayableAnimator3D _visualAnimator;
     WeaponKickAnimator3D _weaponKick;
+    WeaponController3D _weaponController;
     float _cooldown;
     Vector3 _aimDirection = Vector3.forward;
     int _ammoRemaining;
@@ -24,7 +25,8 @@ public class PlayerController3D : MonoBehaviour
     public float FireCooldown => fireCooldown;
     public float BulletSpeed => bulletSpeed;
     public int MaxAmmo => maxAmmo;
-    public int AmmoRemaining => _ammoRemaining;
+    public int AmmoRemaining => _weaponController != null ? _weaponController.AmmoRemaining : _ammoRemaining;
+    public string ActiveWeaponName => _weaponController != null ? _weaponController.ActiveWeaponName : "Blaster";
 
     void Awake()
     {
@@ -47,6 +49,10 @@ public class PlayerController3D : MonoBehaviour
     {
         _visualAnimator = GetComponentInChildren<CharacterPlayableAnimator3D>();
         _weaponKick = GetComponentInChildren<WeaponKickAnimator3D>();
+        _weaponController = GetComponent<WeaponController3D>();
+        if (_weaponController == null)
+            _weaponController = gameObject.AddComponent<WeaponController3D>();
+        _weaponController.SetAmmoCapacity(maxAmmo);
     }
 
     void Update()
@@ -99,14 +105,23 @@ public class PlayerController3D : MonoBehaviour
         _cooldown -= Time.deltaTime;
         bool fire = Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space);
         if (!fire || _cooldown > 0f) return;
-        if (_ammoRemaining <= 0) return;
+        if (_weaponController == null && _ammoRemaining <= 0) return;
 
         Vector3 origin = transform.position;
         origin.y = 0.35f;
         Vector3 spawn = origin + _aimDirection * muzzleOffset;
-        BulletFactory3D.Spawn(spawn, _aimDirection, bulletSpeed);
+        bool fired = _weaponController != null ? _weaponController.TryFire(_aimDirection) : false;
+        if (!fired && _weaponController == null)
+        {
+            BulletFactory3D.Spawn(spawn, _aimDirection, bulletSpeed);
+            _ammoRemaining--;
+            _cooldown = fireCooldown;
+        }
+        else if (!fired)
+        {
+            return;
+        }
         _cooldown = fireCooldown;
-        _ammoRemaining--;
         if (_visualAnimator != null)
             _visualAnimator.TriggerAttack();
         if (_weaponKick != null)
@@ -126,6 +141,11 @@ public class PlayerController3D : MonoBehaviour
                 break;
             case "bullet_speed":
                 bulletSpeed = Mathf.Min(bulletSpeed * 1.2f, 48f);
+                break;
+            case "ammo_pack":
+            case "damage_boost":
+                if (_weaponController != null)
+                    _weaponController.ApplyModifier(upgradeId);
                 break;
         }
     }

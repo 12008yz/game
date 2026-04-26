@@ -29,6 +29,9 @@ public class ChaserEnemy3D : MonoBehaviour
     float _nextOverlapResolveTime;
     float _overlapInterval;
     const float GroundY = 0f;
+    EnemyRole3D _role = EnemyRole3D.Grunt;
+    float _rangedTimer;
+    float _baseSpeed;
 
     void Awake()
     {
@@ -41,6 +44,7 @@ public class ChaserEnemy3D : MonoBehaviour
         }
         _overlapInterval = Random.Range(0.08f, 0.16f);
         _nextOverlapResolveTime = Time.time + Random.Range(0f, _overlapInterval);
+        _baseSpeed = speed;
         EnsureVisual();
         _maxHp = Mathf.Max(1, hp);
         CreateHealthBar();
@@ -53,6 +57,7 @@ public class ChaserEnemy3D : MonoBehaviour
         rb.useGravity = false;
         rb.isKinematic = true;
         rb.constraints = RigidbodyConstraints.FreezeRotation;
+        ApplyRoleStats();
     }
 
     void Start()
@@ -95,7 +100,13 @@ public class ChaserEnemy3D : MonoBehaviour
         Vector3 d = target - pos;
         if (d.sqrMagnitude > 0.0001f)
         {
-            Vector3 step = d.normalized * (speed * Time.deltaTime);
+            Vector3 moveDir = d.normalized;
+            if (_role == EnemyRole3D.Ranged)
+            {
+                float dist = d.magnitude;
+                if (dist < 6.5f) moveDir = -moveDir;
+            }
+            Vector3 step = moveDir * (speed * Time.deltaTime);
             MoveWithCollision(step);
             RotateTowards(d);
             if (_visualAnimator != null)
@@ -106,6 +117,9 @@ public class ChaserEnemy3D : MonoBehaviour
                 _visualAnimator.TriggerAttack();
                 _attackAnimTimer = attackAnimInterval;
             }
+
+            if (_role == EnemyRole3D.Ranged || _role == EnemyRole3D.Boss)
+                HandleRangedAttack(d);
         }
 
         UpdateHealthBar();
@@ -341,6 +355,12 @@ public class ChaserEnemy3D : MonoBehaviour
         Destroy(gameObject);
     }
 
+    public void OverrideRole(EnemyRole3D role)
+    {
+        _role = role;
+        ApplyRoleStats();
+    }
+
     void OnCollisionStay(Collision collision)
     {
         var p = collision.gameObject.GetComponent<PlayerController3D>();
@@ -353,5 +373,55 @@ public class ChaserEnemy3D : MonoBehaviour
             }
             GameManager3D.Instance.NotifyPlayerDied();
         }
+    }
+
+    void ApplyRoleStats()
+    {
+        speed = _baseSpeed;
+        switch (_role)
+        {
+            case EnemyRole3D.Fast:
+                speed *= 1.55f;
+                hp = Mathf.Max(hp, 1);
+                break;
+            case EnemyRole3D.Tank:
+                speed *= 0.72f;
+                hp = Mathf.Max(hp, 3);
+                transform.localScale = Vector3.one * 1.15f;
+                break;
+            case EnemyRole3D.Ranged:
+                speed *= 1.05f;
+                hp = Mathf.Max(hp, 2);
+                break;
+            case EnemyRole3D.Elite:
+                speed *= 1.2f;
+                hp = Mathf.Max(hp, 4);
+                transform.localScale = Vector3.one * 1.08f;
+                break;
+            case EnemyRole3D.Boss:
+                speed *= 0.85f;
+                hp = Mathf.Max(hp, 12);
+                transform.localScale = Vector3.one * 1.45f;
+                break;
+            default:
+                hp = Mathf.Max(hp, 1);
+                break;
+        }
+        _maxHp = Mathf.Max(1, hp);
+    }
+
+    void HandleRangedAttack(Vector3 toPlayer)
+    {
+        _rangedTimer -= Time.deltaTime;
+        if (_rangedTimer > 0f) return;
+        float sq = toPlayer.sqrMagnitude;
+        float min = _role == EnemyRole3D.Boss ? 8f : 6f;
+        float max = _role == EnemyRole3D.Boss ? 18f : 14f;
+        if (sq < min * min || sq > max * max) return;
+
+        _rangedTimer = _role == EnemyRole3D.Boss ? 0.65f : 1.25f;
+        Vector3 origin = transform.position + Vector3.up * 0.55f;
+        Vector3 dir = toPlayer.normalized;
+        EnemyProjectile3D.Spawn(origin, dir, _role == EnemyRole3D.Boss ? 13f : 10f);
     }
 }

@@ -31,6 +31,7 @@ public static class Bootstrap3D
             go.AddComponent<GameHUDCanvas3D>();
             go.AddComponent<PerformanceProbe3D>();
             go.AddComponent<StressBenchmark3D>();
+            go.AddComponent<AutoBenchmarkSuite3D>();
         }
     }
 

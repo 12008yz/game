@@ -7,7 +7,7 @@ public class GameBalance3D : ScriptableObject
     public float playerMoveSpeed = 7f;
     public float playerFireCooldown = 0.18f;
     public float playerBulletSpeed = 22f;
-    public int playerMaxAmmo = 20;
+    public int playerMaxAmmo = 80;
 
     [Header("Enemies")]
     public float enemyMoveSpeed = 2.3f;

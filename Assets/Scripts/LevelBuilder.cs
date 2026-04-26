@@ -24,11 +24,14 @@ public class LevelBuilder : MonoBehaviour
     [SerializeField] int obstacleCount = 11;
     [SerializeField] int buildingCount = 4;
     [SerializeField] int chestCount = 7;
+    [SerializeField] MapProfile3D[] mapProfiles;
+    MapProfile3D _activeProfile;
     PlayerController3D _player;
 
     void Awake()
     {
         Instance = this;
+        SelectMapProfile();
         BuildArena();
         SpawnObstacles();
         SpawnBuildings();
@@ -52,7 +55,8 @@ public class LevelBuilder : MonoBehaviour
         floor.transform.SetParent(root);
         floor.transform.position = center;
         floor.transform.localScale = new Vector3(w, 0.1f, h);
-        Paint(floor, GetOrCreateMaterial(ref _floorMat, new Color(0.1f, 0.12f, 0.18f)));
+        Color floorColor = _activeProfile != null ? _activeProfile.floorColor : new Color(0.1f, 0.12f, 0.18f);
+        Paint(floor, GetOrCreateMaterial(ref _floorMat, floorColor));
         floor.isStatic = true;
 
         CreateWall(root, new Vector3(0f, wallHeight * 0.5f, h * 0.5f), new Vector3(w, wallHeight, 1.2f));
@@ -68,7 +72,8 @@ public class LevelBuilder : MonoBehaviour
         wall.transform.SetParent(parent);
         wall.transform.position = pos;
         wall.transform.localScale = scale;
-        Paint(wall, GetOrCreateMaterial(ref _wallMat, new Color(0.32f, 0.34f, 0.42f)));
+        Color wallColor = _activeProfile != null ? _activeProfile.wallColor : new Color(0.32f, 0.34f, 0.42f);
+        Paint(wall, GetOrCreateMaterial(ref _wallMat, wallColor));
         wall.AddComponent<WallTag>();
         wall.isStatic = true;
     }
@@ -156,7 +161,7 @@ public class LevelBuilder : MonoBehaviour
         go.transform.rotation = Quaternion.Euler(50f, -35f, 0f);
     }
 
-    public void SpawnEnemyWave(int count)
+    public void SpawnEnemyWave(int count, EnemyRole3D forcedRole = EnemyRole3D.Grunt)
     {
         int safeCount = Mathf.Max(1, count);
         var wavePositions = new List<Vector3>(safeCount);
@@ -166,7 +171,8 @@ public class LevelBuilder : MonoBehaviour
             wavePositions.Add(p);
             var e = new GameObject("Enemy");
             e.transform.position = p;
-            e.AddComponent<ChaserEnemy3D>();
+            var enemy = e.AddComponent<ChaserEnemy3D>();
+            enemy.OverrideRole(forcedRole == EnemyRole3D.Grunt ? RollRoleByWave() : forcedRole);
         }
     }
 
@@ -175,7 +181,8 @@ public class LevelBuilder : MonoBehaviour
         var root = new GameObject("Obstacles").transform;
         root.SetParent(transform);
 
-        for (int i = 0; i < obstacleCount; i++)
+        int count = _activeProfile != null ? _activeProfile.obstacleCount : obstacleCount;
+        for (int i = 0; i < count; i++)
         {
             Vector3 p = RandomGroundPos(2f);
             var go = GameObject.CreatePrimitive(i % 3 == 0 ? PrimitiveType.Cylinder : PrimitiveType.Cube);
@@ -198,7 +205,8 @@ public class LevelBuilder : MonoBehaviour
         var root = new GameObject("Buildings").transform;
         root.SetParent(transform);
 
-        for (int i = 0; i < buildingCount; i++)
+        int count = _activeProfile != null ? _activeProfile.buildingCount : buildingCount;
+        for (int i = 0; i < count; i++)
         {
             Vector3 p = RandomGroundPos(4.5f);
 
@@ -231,7 +239,8 @@ public class LevelBuilder : MonoBehaviour
         var root = new GameObject("Chests").transform;
         root.SetParent(transform);
 
-        for (int i = 0; i < chestCount; i++)
+        int count = _activeProfile != null ? _activeProfile.chestCount : chestCount;
+        for (int i = 0; i < count; i++)
         {
             Vector3 p = RandomGroundPos(1.8f);
 
@@ -387,6 +396,59 @@ public class LevelBuilder : MonoBehaviour
     {
         if (Instance == this)
             Instance = null;
+    }
+
+    void SelectMapProfile()
+    {
+        if (mapProfiles != null && mapProfiles.Length > 0)
+        {
+            _activeProfile = mapProfiles[Random.Range(0, mapProfiles.Length)];
+            return;
+        }
+
+        _activeProfile = ScriptableObject.CreateInstance<MapProfile3D>();
+        int roll = Random.Range(0, 3);
+        if (roll == 0)
+        {
+            _activeProfile.profileId = "urban";
+            _activeProfile.biome = MapBiome3D.Urban;
+            _activeProfile.obstacleCount = 11;
+            _activeProfile.buildingCount = 4;
+            _activeProfile.chestCount = 7;
+            _activeProfile.floorColor = new Color(0.1f, 0.12f, 0.18f);
+            _activeProfile.wallColor = new Color(0.32f, 0.34f, 0.42f);
+        }
+        else if (roll == 1)
+        {
+            _activeProfile.profileId = "industrial";
+            _activeProfile.biome = MapBiome3D.Industrial;
+            _activeProfile.obstacleCount = 15;
+            _activeProfile.buildingCount = 6;
+            _activeProfile.chestCount = 5;
+            _activeProfile.floorColor = new Color(0.13f, 0.11f, 0.09f);
+            _activeProfile.wallColor = new Color(0.38f, 0.3f, 0.2f);
+        }
+        else
+        {
+            _activeProfile.profileId = "ruins";
+            _activeProfile.biome = MapBiome3D.Ruins;
+            _activeProfile.obstacleCount = 9;
+            _activeProfile.buildingCount = 3;
+            _activeProfile.chestCount = 10;
+            _activeProfile.floorColor = new Color(0.09f, 0.14f, 0.12f);
+            _activeProfile.wallColor = new Color(0.24f, 0.37f, 0.31f);
+        }
+    }
+
+    EnemyRole3D RollRoleByWave()
+    {
+        int wave = GameManager3D.Instance != null ? GameManager3D.Instance.WaveIndex : 1;
+        int r = Random.Range(0, 100);
+        if (wave >= 4 && r > 92) return EnemyRole3D.Elite;
+        if (wave >= 3 && r > 72) return EnemyRole3D.Ranged;
+        if (wave >= 2 && r > 52) return EnemyRole3D.Tank;
+        if (r > 30) return EnemyRole3D.Fast;
+        return EnemyRole3D.Grunt;
     }
 }
 
