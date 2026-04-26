@@ -4,6 +4,7 @@ using System.IO;
 public class PerformanceProbe3D : MonoBehaviour
 {
     public static PerformanceProbe3D Instance { get; private set; }
+    public bool IsBenchmarkRunning => _benchRunning;
 
     [SerializeField] bool enableOverlay = true;
     [SerializeField] bool logEvery10Seconds = true;

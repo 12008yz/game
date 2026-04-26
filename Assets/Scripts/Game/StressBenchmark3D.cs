@@ -13,6 +13,7 @@ public class StressBenchmark3D : MonoBehaviour
     float _timer;
     float _spawnTimer;
     bool _running;
+    float _qualityBlockedLogCooldown;
 
     void Update()
     {
@@ -63,10 +64,33 @@ public class StressBenchmark3D : MonoBehaviour
     void HandleQualityHotkeys()
     {
         if (Input.GetKeyDown(lowQualityKey))
+        {
+            if (IsQualitySwitchBlocked()) return;
             Bootstrap3D.SetRuntimeQualityTier(Bootstrap3D.RuntimeQualityTier.Low);
+        }
         else if (Input.GetKeyDown(mediumQualityKey))
+        {
+            if (IsQualitySwitchBlocked()) return;
             Bootstrap3D.SetRuntimeQualityTier(Bootstrap3D.RuntimeQualityTier.Medium);
+        }
         else if (Input.GetKeyDown(highQualityKey))
+        {
+            if (IsQualitySwitchBlocked()) return;
             Bootstrap3D.SetRuntimeQualityTier(Bootstrap3D.RuntimeQualityTier.High);
+        }
+    }
+
+    bool IsQualitySwitchBlocked()
+    {
+        var probe = PerformanceProbe3D.Instance;
+        bool blocked = _running || (probe != null && probe.IsBenchmarkRunning);
+        if (!blocked) return false;
+
+        if (Time.unscaledTime >= _qualityBlockedLogCooldown)
+        {
+            _qualityBlockedLogCooldown = Time.unscaledTime + 1f;
+            Debug.Log("[StressBenchmark3D] Quality switch is blocked while benchmark is running.");
+        }
+        return true;
     }
 }
