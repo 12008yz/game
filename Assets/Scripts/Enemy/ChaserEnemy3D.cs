@@ -28,6 +28,7 @@ public class ChaserEnemy3D : MonoBehaviour
     float _attackAnimTimer;
     float _nextOverlapResolveTime;
     float _overlapInterval;
+    const float GroundY = 0f;
 
     void Awake()
     {
@@ -75,6 +76,13 @@ public class ChaserEnemy3D : MonoBehaviour
         if (_player == null) return;
         if (GameManager3D.Instance != null && GameManager3D.Instance.GameOver) return;
 
+        var p0 = transform.position;
+        if (Mathf.Abs(p0.y - GroundY) > 0.001f)
+        {
+            p0.y = GroundY;
+            transform.position = p0;
+        }
+
         if (Time.time >= _nextOverlapResolveTime)
         {
             _nextOverlapResolveTime = Time.time + _overlapInterval;
@@ -103,6 +111,14 @@ public class ChaserEnemy3D : MonoBehaviour
         UpdateHealthBar();
         if (_attackAnimTimer > 0f)
             _attackAnimTimer -= Time.deltaTime;
+
+        // Keep enemies on navigation plane to avoid vertical "launch" artifacts.
+        var pg = transform.position;
+        if (Mathf.Abs(pg.y - GroundY) > 0.001f)
+        {
+            pg.y = GroundY;
+            transform.position = pg;
+        }
     }
 
     void RotateTowards(Vector3 direction)
@@ -127,7 +143,9 @@ public class ChaserEnemy3D : MonoBehaviour
 
         if (!Physics.CapsuleCast(p1, p2, bodyRadius, dir, out RaycastHit hit, dist + skin, ~0, QueryTriggerInteraction.Ignore))
         {
-            transform.position = basePos + step;
+            Vector3 next = basePos + step;
+            next.y = GroundY;
+            transform.position = next;
             return;
         }
 
@@ -136,9 +154,11 @@ public class ChaserEnemy3D : MonoBehaviour
         Vector3 moved = basePos + dir * allowed;
         Vector3 remain = step - dir * allowed;
         Vector3 slide = Vector3.ProjectOnPlane(remain, hit.normal);
+        slide.y = 0f;
 
         if (slide.sqrMagnitude <= 0.000001f)
         {
+            moved.y = GroundY;
             transform.position = moved;
             return;
         }
@@ -149,9 +169,17 @@ public class ChaserEnemy3D : MonoBehaviour
         Vector3 sp2 = sp1 + up * (half * 2f);
 
         if (!Physics.CapsuleCast(sp1, sp2, bodyRadius, sdir, out RaycastHit sh, sdist + skin, ~0, QueryTriggerInteraction.Ignore))
-            transform.position = moved + slide;
+        {
+            Vector3 next = moved + slide;
+            next.y = GroundY;
+            transform.position = next;
+        }
         else
-            transform.position = moved + sdir * Mathf.Max(0f, sh.distance - skin);
+        {
+            Vector3 next = moved + sdir * Mathf.Max(0f, sh.distance - skin);
+            next.y = GroundY;
+            transform.position = next;
+        }
     }
 
     void ResolveOverlaps()
@@ -175,7 +203,9 @@ public class ChaserEnemy3D : MonoBehaviour
                 other, other.transform.position, other.transform.rotation,
                 out Vector3 dir, out float dist))
             {
-                transform.position += dir * (dist + skin);
+                Vector3 planar = new Vector3(dir.x, 0f, dir.z);
+                if (planar.sqrMagnitude > 0.000001f)
+                    transform.position += planar.normalized * (dist + skin);
             }
         }
     }

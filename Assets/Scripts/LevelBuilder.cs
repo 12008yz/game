@@ -319,6 +319,8 @@ public class LevelBuilder : MonoBehaviour
                 continue;
             if (!IsFarFromReserved(p, reservedPositions, minDistanceBetweenEnemies))
                 continue;
+            if (!IsFarFromAliveEnemies(p, minDistanceBetweenEnemies))
+                continue;
 
             Vector3 p1 = p + Vector3.up * radius;
             Vector3 p2 = p1 + Vector3.up * (half * 2f);
@@ -331,10 +333,24 @@ public class LevelBuilder : MonoBehaviour
             Vector3 fallback = RandomGroundPos(padding);
             if ((fallback - playerPos).sqrMagnitude < minDistanceFromPlayer * minDistanceFromPlayer) continue;
             if (!IsFarFromReserved(fallback, reservedPositions, minDistanceBetweenEnemies)) continue;
+            if (!IsFarFromAliveEnemies(fallback, minDistanceBetweenEnemies)) continue;
             return fallback;
         }
 
-        return playerPos + new Vector3(Random.Range(-halfW, halfW), 0f, Random.Range(-halfH, halfH));
+        for (int i = 0; i < 24; i++)
+        {
+            Vector3 emergency = new Vector3(Random.Range(-halfW, halfW), 0f, Random.Range(-halfH, halfH));
+            if ((emergency - playerPos).sqrMagnitude < minDistanceFromPlayer * minDistanceFromPlayer) continue;
+            if (!IsFarFromReserved(emergency, reservedPositions, minDistanceBetweenEnemies)) continue;
+            if (!IsFarFromAliveEnemies(emergency, minDistanceBetweenEnemies)) continue;
+            return emergency;
+        }
+
+        Vector3 safest = playerPos + (Random.insideUnitSphere * 10f);
+        safest.y = 0f;
+        safest.x = Mathf.Clamp(safest.x, -halfW, halfW);
+        safest.z = Mathf.Clamp(safest.z, -halfH, halfH);
+        return safest;
     }
 
     static bool IsFarFromReserved(Vector3 p, List<Vector3> reserved, float minDistance)
@@ -344,6 +360,24 @@ public class LevelBuilder : MonoBehaviour
         for (int i = 0; i < reserved.Count; i++)
         {
             if ((reserved[i] - p).sqrMagnitude < sq)
+                return false;
+        }
+        return true;
+    }
+
+    static bool IsFarFromAliveEnemies(Vector3 p, float minDistance)
+    {
+        float sq = minDistance * minDistance;
+        var enemies = FindObjectsByType<ChaserEnemy3D>(FindObjectsSortMode.None);
+        for (int i = 0; i < enemies.Length; i++)
+        {
+            var e = enemies[i];
+            if (e == null) continue;
+            Vector3 ep = e.transform.position;
+            ep.y = 0f;
+            Vector3 pp = p;
+            pp.y = 0f;
+            if ((ep - pp).sqrMagnitude < sq)
                 return false;
         }
         return true;

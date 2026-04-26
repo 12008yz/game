@@ -17,6 +17,7 @@ public class PlayerController3D : MonoBehaviour
     float _cooldown;
     Vector3 _aimDirection = Vector3.forward;
     int _ammoRemaining;
+    const float GroundY = 0f;
 
     public Vector3 AimDirection => _aimDirection;
     public float MoveSpeed => moveSpeed;
@@ -37,6 +38,8 @@ public class PlayerController3D : MonoBehaviour
             maxAmmo = balance.playerMaxAmmo;
         }
         _cc = GetComponent<CharacterController>();
+        _cc.stepOffset = 0f;
+        _cc.slopeLimit = 5f;
         _ammoRemaining = Mathf.Max(0, maxAmmo);
     }
 
@@ -62,6 +65,12 @@ public class PlayerController3D : MonoBehaviour
         if (input.sqrMagnitude > 1f) input.Normalize();
         Vector3 delta = new Vector3(input.x, 0f, input.y) * (moveSpeed * Time.deltaTime);
         _cc.Move(delta);
+        var p = transform.position;
+        if (Mathf.Abs(p.y - GroundY) > 0.001f)
+        {
+            p.y = GroundY;
+            transform.position = p;
+        }
         if (_visualAnimator != null)
             _visualAnimator.SetMoveAmount(input.magnitude);
     }
