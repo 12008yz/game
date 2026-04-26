@@ -56,11 +56,12 @@ public class GameHUDCanvas3D : MonoBehaviour
         var player = FindFirstObjectByType<PlayerController3D>();
         int ammoRemaining = player != null ? player.AmmoRemaining : 0;
         int maxAmmo = player != null ? player.MaxAmmo : 0;
+        string ammoText = (player != null && player.InfiniteAmmo) ? "AMMO ∞" : $"AMMO {ammoRemaining}/{maxAmmo}";
 
         DrawRect(new Rect(8, 6, 330, 112), new Color(0f, 0f, 0f, 0.45f));
         GUI.Label(new Rect(12, 10, 500, 30), $"Kills: {gm.Kills}", _style);
         GUI.Label(new Rect(12, 34, 500, 30), $"Wave {gm.WaveIndex}  {gm.WaveKills}/{gm.WaveTarget}", _style);
-        GUI.Label(new Rect(12, 62, 520, 50), $"AMMO {ammoRemaining}/{maxAmmo}", _ammoStyle);
+        GUI.Label(new Rect(12, 62, 520, 50), ammoText, _ammoStyle);
         GUI.Label(new Rect(12, 98, 520, 30), $"Weapon: {(player != null ? player.ActiveWeaponName : "Blaster")}", _style);
         DrawRect(new Rect(8, Screen.height - 40, 760, 32), new Color(0f, 0f, 0f, 0.45f));
         GUI.Label(new Rect(12, Screen.height - 36, 1200, 30), "WASD move | Mouse aim | LMB/Space fire | 1..4 weapon | R restart", _style);
@@ -115,8 +116,8 @@ public class GameHUDCanvas3D : MonoBehaviour
         float x = (Screen.width - w) * 0.5f;
         float y = Screen.height * 0.2f;
         DrawRect(new Rect(x, y, w, h), new Color(0f, 0f, 0f, 0.72f));
-        GUI.Label(new Rect(x + 20f, y + 16f, w - 40f, 42f), "Choose upgrade: press 1 / 2 / 3", _titleStyle);
-        GUI.Label(new Rect(x + 20f, y + 48f, w - 40f, 24f), "If you do nothing, upgrade #1 is auto-picked in ~12s", _style);
+        GUI.Label(new Rect(x + 20f, y + 16f, w - 40f, 42f), "Wave cleared - choose weapon (1 / 2 / 3)", _titleStyle);
+        GUI.Label(new Rect(x + 20f, y + 48f, w - 40f, 24f), "The game continues only after explicit weapon choice.", _style);
         string[] choices = gm.UpgradeChoices;
         if (choices == null || choices.Length < 3) return;
         for (int i = 0; i < 3; i++)

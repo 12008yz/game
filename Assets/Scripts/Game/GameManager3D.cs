@@ -31,9 +31,9 @@ public class GameManager3D : MonoBehaviour
     int _waveTarget;
     int _waveSpawned;
     bool _bossSpawned;
-    string[] _upgradeChoices = { "fire_rate", "move_speed", "ammo_pack" };
+    string[] _upgradeChoices = { "Blaster Beam", "Scatter Shotgun", "Burst Carbine" };
+    int[] _weaponChoiceIndices = { 0, 1, 2 };
     int _sessionCurrency;
-    float _upgradeAutoPickTimer;
 
     public event System.Action<int> OnWaveStarted;
     public event System.Action<int> OnWaveCleared;
@@ -54,6 +54,7 @@ public class GameManager3D : MonoBehaviour
     public int WaveTarget => _waveTarget;
     public int WaveKills => _waveKills;
     public string[] UpgradeChoices => _upgradeChoices;
+    public int[] WeaponChoiceIndices => _weaponChoiceIndices;
     public int SessionCurrency => _sessionCurrency;
 
     void Awake()
@@ -125,9 +126,6 @@ public class GameManager3D : MonoBehaviour
 
         if (_runState == RunState3D.UpgradeChoice)
         {
-            _upgradeAutoPickTimer -= Time.unscaledDeltaTime;
-            if (_upgradeAutoPickTimer <= 0f)
-                SelectUpgrade(0);
             HandleUpgradeInput();
             return;
         }
@@ -267,15 +265,21 @@ public class GameManager3D : MonoBehaviour
 
         RollUpgradeChoices();
         _runState = RunState3D.UpgradeChoice;
-        _upgradeAutoPickTimer = 12f;
         Time.timeScale = 0f;
     }
 
     void RollUpgradeChoices()
     {
-        string[] pool = { "fire_rate", "move_speed", "bullet_speed", "ammo_pack", "damage_boost" };
+        if (_player == null) return;
+        var wc = _player.GetComponent<WeaponController3D>();
+        if (wc == null) return;
+        var offer = wc.BuildWeaponOffer(3);
         for (int i = 0; i < _upgradeChoices.Length; i++)
-            _upgradeChoices[i] = pool[Random.Range(0, pool.Length)];
+        {
+            int weaponIdx = (offer != null && i < offer.Length) ? offer[i] : 0;
+            _weaponChoiceIndices[i] = weaponIdx;
+            _upgradeChoices[i] = wc.GetWeaponName(weaponIdx);
+        }
     }
 
     void HandleUpgradeInput()
@@ -288,16 +292,13 @@ public class GameManager3D : MonoBehaviour
     void SelectUpgrade(int idx)
     {
         if (idx < 0 || idx >= _upgradeChoices.Length) return;
-        string id = _upgradeChoices[idx];
-        if (_player != null)
-            _player.ApplyUpgrade(id);
-        if (_player != null)
-        {
-            var wc = _player.GetComponent<WeaponController3D>();
-            if (wc != null)
-                wc.RefillAmmo(8);
-        }
-        OnUpgradeChosen?.Invoke(id);
+        if (_player == null) return;
+        var wc = _player.GetComponent<WeaponController3D>();
+        if (wc == null) return;
+        int weaponIdx = _weaponChoiceIndices[idx];
+        wc.SelectWeapon(weaponIdx);
+        wc.RefillAmmo(10);
+        OnUpgradeChosen?.Invoke(_upgradeChoices[idx]);
         Time.timeScale = 1f;
         BeginWave(_waveIndex + 1);
         TrySpawnEnemies();

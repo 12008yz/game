@@ -27,6 +27,7 @@ public class LevelBuilder : MonoBehaviour
     [SerializeField] MapProfile3D[] mapProfiles;
     MapProfile3D _activeProfile;
     PlayerController3D _player;
+    public float ArenaMaxSpan => Mathf.Max(width, height) * cellSize;
 
     void Awake()
     {
@@ -449,6 +450,11 @@ public class LevelBuilder : MonoBehaviour
         if (wave >= 2 && r > 52) return EnemyRole3D.Tank;
         if (r > 30) return EnemyRole3D.Fast;
         return EnemyRole3D.Grunt;
+    }
+
+    public float GetRangeByArenaFraction(float fraction)
+    {
+        return Mathf.Max(1f, ArenaMaxSpan * Mathf.Max(0.001f, fraction));
     }
 }
 

@@ -27,6 +27,7 @@ public class PlayerController3D : MonoBehaviour
     public int MaxAmmo => maxAmmo;
     public int AmmoRemaining => _weaponController != null ? _weaponController.AmmoRemaining : _ammoRemaining;
     public string ActiveWeaponName => _weaponController != null ? _weaponController.ActiveWeaponName : "Blaster";
+    public bool InfiniteAmmo => _weaponController != null && _weaponController.InfiniteAmmo;
 
     void Awake()
     {
@@ -102,6 +103,18 @@ public class PlayerController3D : MonoBehaviour
 
     void Shoot()
     {
+        bool holdFire = Input.GetMouseButton(0) || Input.GetKey(KeyCode.Space);
+        if (_weaponController != null && _weaponController.IsContinuousBeamWeaponActive())
+        {
+            _weaponController.SetBeamHolding(holdFire, _aimDirection);
+            if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space))
+            {
+                if (_visualAnimator != null) _visualAnimator.TriggerAttack();
+                if (_weaponKick != null) _weaponKick.TriggerKick();
+            }
+            return;
+        }
+
         _cooldown -= Time.deltaTime;
         bool fire = Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space);
         if (!fire || _cooldown > 0f) return;
